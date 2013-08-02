@@ -4,65 +4,70 @@
 ' // ***************************************************************************
 ' //
 ' // Copyright (c)	Nino Floris.  You are allowed to use this for non-commercial usage.
-' // Contact me for commercial usage, commercial usage is, but not limited to,
-' // distribution of these source files, integration into commercial software, or using it as content for your commercial services.
+' // Please contact me for commercial usage, commercial usage is, but not limited to,
+' // distribution of these source files, integration into commercial software, or using it as part of your commercial services.
 ' //
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.3.1040.00
+' // Version:   1.5.0000.00
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
-' // Usage:     cscript.exe [//nologo] ZTIDellBIOSSettings.wsf [/debug:true] [/settings|/settings:"path"] [/password] [/arguments|/arguments:"arguments"]
+' // Usage:     cscript.exe [//nologo] ZTIDellBIOSSettings.wsf [/debug:true] [/settings] [/password] [/arguments|/arguments:"arguments"]
 ' //
 ' // ***************************************************************************
 
 Option Explicit
 RunNewInstance
 
-'//----------------------------------------------------------------------------
-'//  Main Class
-'//----------------------------------------------------------------------------
-
 Class ZTIDellBIOSSettings
 
-	Dim iRetCode,iRetVal
-	Dim sCCTKpath,sCurrentBIOSPassword,sBIOSSettingsFile,sLocalBIOSSettings,sFiles,sOriginalWorkingDirectory
-
-	'//----------------------------------------------------------------------------
-	'//  Main routine
-	'//----------------------------------------------------------------------------
+	Dim iRetCode,iRetVal,iPrep
+	Dim sCCTKPath,sCurrentBIOSPassword,sBIOSSettingsFile,sCommand,sFiles,sOriginalWorkingDirectory
 
 	Function Main
 
 		Dim sFile
 
 		iRetVal = Success
+		iPrep = Success
 		sOriginalWorkingDirectory = oShell.CurrentDirectory
 
 		oLogging.CreateEntry "ZTIDellBIOSSettings has started." , LogTypeInfo
-		'Validate that its is a Dell PC.
- 		If oEnvironment.Item("Make") = "Dell Inc." Then
- 		else
-			oLogging.CreateEntry "CCTK can only run on Dell PC's.", LogTypeError
-			Main = Failure
-			Exit Function
+		'Validate that this is a Dell system.
+ 		If Not oEnvironment.Item("Make") = "Dell Inc." Then
+			oLogging.CreateEntry "ZTIDellBIOSSettings can only run on Dell systems.", LogTypeError
+			iPrep = Failure
 		End If
 
 		'Set CCTKPath.
 		If oEnvironment.Exists("CCTKPath") And oFSO.FolderExists(oEnvironment.Item("CCTKpath"))  Then
-			sCCTKpath = oEnvironment.Item("CCTKpath")
-		ElseIf oFSO.FolderExists("X:\" & oEnvironment.Item("Architecture") & "\CCTK" ) Then
-			sCCTKpath = "X:\" & oEnvironment.Item("Architecture") & "\CCTK"
-		Else
-			oLogging.CreateEntry "Unable to find CCTK folder." , LogTypeError
-			oLogging.CreateEntry "Searched in default location=""X:\" & oEnvironment.Item("Architecture") & "\CCTK"" and in variable CCTKPath=""" & oEnvironment.Item("CCTKpath") , LogTypeVerbose
-			Main = Failure
-			Exit Function
+			If oFSO.FileExists(oEnvironment.Item("CCTKPath") & "\cctk.exe") Then
+				sCCTKPath = oEnvironment.Item("CCTKpath")
+			End If
+		ElseIf oFSO.FolderExists("X:\CCTK") Then
+			If oFSO.FileExists("X:\CCTK\cctk.exe") Then
+				sCCTKPath = "X:\CCTK"
+			End If
+		ElseIf IsRelativePath(oEnvironment.Item("CCTKpath")) And oFSO.FolderExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("CCTKPath")) Then
+			'Check the original working directory + CCTKpath variable for settings. This way SCCM CCTK packages are possible.
+			If oFSO.FileExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("CCTKPath") & "\cctk.exe") Then
+				sCCTKPath = sOriginalWorkingDirectory & "\" & oEnvironment.Item("CCTKPath")
+			End If
 		End If
-
-		'Check for all CCTK files.
+		
+		If sCCTKPath = "" Then 
+			oLogging.CreateEntry "Unable to find CCTK folder." , LogTypeError
+			oLogging.CreateEntry "Searched in variable CCTKPath=""" & oEnvironment.Item("CCTKpath") & """ in location=""X:\CCTK"" and in the working directory + the variable CCTKPath=""" & sOriginalWorkingDirectory & oEnvironment.Item("CCTKPath") & """." , LogTypeVerbose
+			iPrep = Failure
+		Else
+			'Set current working directory to CCTKPath for pretty command-lines.
+			oShell.CurrentDirectory = sCCTKPath
+			oLogging.CreateEntry "CCTK location is: """ & sCCTKPath & """." , LogTypeInfo
+		End If
+		
+		'Check for existance of all CCTK files.
 		If oEnvironment.Item("Architecture") = "X86" then
 			sFiles = Array("cctk.exe","mxml1.dll","pci.ids","HAPI\hapint.exe","HAPI\dcmdev32.exe","HAPI\dchcfg32.exe","HAPI\dchipm32.dll","HAPI\dchbas32.dll","HAPI\dchapi32.dll","HAPI\dcdbas32.sys","HAPI\dcdbas32.inf","HAPI\dcdbas32.cat")
 		Else
@@ -70,194 +75,245 @@ Class ZTIDellBIOSSettings
 		End If
 
 		For Each sFile In sFiles
-			If oFSO.FileExists(sCCTKpath & "\" & sFile) = False Then
-				oLogging.CreateEntry "Missing CCTK file """ & sCCTKpath & "\" & sFile & """", LogTypeError
-				Main = Failure
+			If oFSO.FileExists(sFile) = False Then
+				oLogging.CreateEntry "Unable to find CCTK file: """ & sFile & """  in CCTK location.", LogTypeError
+				iPrep = Failure
 			End If
 		Next
-		If Main = Failure Then Exit Function
-
-		'Start Winmgmt
-		iRetCode = oShell.Run("net start winmgmt", 0, True)
-		If iRetCode = 0 Or iRetCode = 2 Or iRetCode = 10 Then
-		oLogging.CreateEntry "The winmgmt service has been successfully started.", LogTypeInfo
-		Else
-		oLogging.CreateEntry "Could not start winmgmt service, the HAPI driver will not function correctly.", LogTypeWarning
-		End If
-
-		'Start HAPI driver.
-		oShell.CurrentDirectory = sCCTKpath & "\HAPI"
-		iRetCode = oShell.Run("hapint.exe -i -k C-C-T-K -p ""hapint.exe""", 0, True)
-		If iRetCode = 0  Then
-		Else
-		oLogging.CreateEntry "HAPI driver did not install succefully, applying BIOS settings will be slow and limited.", LogTypeWarning
-		End If
-
-		'Handle Password
-		CheckPassword
-
-		'Apply Settings.
-		If oUtility.Arguments.Exists("Settings") Then
-			SetSettings(oUtility.Arguments("Settings"))
-		End If
 		
-		'Apply Arguments
-		If oUtility.Arguments.Exists("Arguments") Then
-			SetArguments(oUtility.Arguments("Arguments"))
-		End If
-		
-		'Apply Password
-		If oUtility.Arguments.Exists("Password") Then
-			SetPassword oEnvironment.Item("NewBIOSPassword")
+		'If not succesful upon this point we won't go any further, it will just generate tons of errors, go straight to cleanup and exit.
+		If iPrep = Success Then
+			'Last operation (Check for all CCTK files) would not reach this line if there was a file missing.
+			oLogging.CreateEntry "All CCTK files in CCTK location present.", LogTypeVerbose
+			
+			'Start Winmgmt
+			iRetCode = oShell.Run("net start winmgmt", 0, True)
+			If iRetCode = 0 Or iRetCode = 2 Or iRetCode = 10 Then
+				oLogging.CreateEntry "The winmgmt service, was successfully started.", LogTypeVerbose
+			Else
+				iPrep = Warning
+				oLogging.CreateEntry "The winmgmt service, was not started, the HAPI driver will not function correctly.", LogTypeWarning
+			End If
+	
+			'Start HAPI driver.
+			iRetCode = oShell.Run("HAPI\hapint.exe -i -k C-C-T-K -p ""hapint.exe""", 0, True)
+			If iRetCode = 0 Then
+				oLogging.CreateEntry "The HAPI driver, was successfully installed.", LogTypeVerbose
+			Else
+				iPrep = Warning
+				oLogging.CreateEntry "The HAPI driver, was not installed, applying BIOS settings will be slow and limited.", LogTypeWarning
+			End If
+			
+			If iPrep = Success Then
+				oLogging.CreateEntry "The CCTK environment setup, has succesfully completed.", LogTypeInfo
+			ElseIf iPrep = Warning Then
+				oLogging.CreateEntry "The CCTK environment setup, has some issues, performance may not be optimal.", LogTypeInfo
+			End If
+			
+			'Handle Password
+			CheckPassword
+	
+			'Apply Settings.
+			If oUtility.Arguments.Exists("Settings") Then
+				SetSettings(oUtility.Arguments("Settings"))
+			End If
+			
+			'Apply Arguments
+			If oUtility.Arguments.Exists("Arguments") Then
+				SetArguments(oUtility.Arguments("Arguments"))
+			End If
+			
+			'Apply Password
+			If oUtility.Arguments.Exists("Password") Then
+				SetPassword(oEnvironment.Item("NewBIOSPassword"))
+			End If
+		ElseIf iPrep = Failure Then
+			oLogging.CreateEntry "The CCTK environment setup, has failed and was aborted.", LogTypeInfo
+			iRetVal = iPrep
 		End If
 		
 		'Cleanup and Exit.
 		If iRetVal = Failure Then
-		oLogging.CreateEntry "ZTIDellBIOSSettings has completed with errors." , LogTypeWarning
+			oLogging.CreateEntry "ZTIDellBIOSSettings has failed, see the log file for more information or try debug mode (/debug:true)." , LogTypeInfo
 		Else
-		oLogging.CreateEntry "ZTIDellBIOSSettings has completed without errors." , LogTypeInfo
+			oLogging.CreateEntry "ZTIDellBIOSSettings has succesfully completed." , LogTypeInfo
 		End If
 
 		Main = iRetVal
 	End Function
 
 	Private Sub SetSettings(Settingspath)
-		oLogging.CreateEntry "Set settings has started." , LogTypeVerbose
+		oLogging.CreateEntry "Set CCTK settings, has started." , LogTypeVerbose
 
 		If oEnvironment.Exists("BIOSSettingsFile") Then
 			sBIOSSettingsFile = oEnvironment.Item("BIOSSettingsFile")
-		ElseIf oFSO.FileExists(oEnvironment.Item("DeployRoot") & "\BIOS\" & oEnvironment.Item("Model") & ".cctk") Then
-			sBIOSSettingsFile = oEnvironment.Item("DeployRoot") & "\BIOS\" & oEnvironment.Item("Model") & ".cctk"
-		ElseIf Not IsEmpty(Settingspath) AND oFSO.FileExists(Settingspath & oEnvironment.Item("Model") & ".cctk") Then
-			sBIOSSettingsFile = Settingspath & oEnvironment.Item("Model") & ".cctk"
-		ElseIf oFSO.FileExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("Model") & ".cctk") Then
-			sBIOSSettingsFile = sOriginalWorkingDirectory & "\" & oEnvironment.Item("Model") & ".cctk"
+		ElseIf IsRelativePath(oEnvironment.Item("BIOSSettingsFile")) And oFSO.FileExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk") Then
+			'Check the original working directory + BIOSSettingsFile variable for settings. This way SCCM settings- or complete CCTK packages are possible.
+			sBIOSSettingsFile = sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk"
 		End If
 
 		If Not oFSO.FileExists(sBIOSSettingsFile) Then
-			oLogging.CreateEntry "Unable to find BIOS settings for model " & oEnvironment.Item("Model"), LogTypeError
-			oLogging.CreateEntry "Searched for file in variable BIOSSettingsFile=""" & oEnvironment.Item("BIOSSettingsFile") & "" , LogTypeVerbose
-			oLogging.CreateEntry "Searched for file in default location=""" & oEnvironment.Item("DeployRoot") & "\BIOS\" & oEnvironment.Item("Model") & ".cctk""" , LogTypeVerbose
-			oLogging.CreateEntry "Searched for file in settings path=""" & Settingspath & oEnvironment.Item("Model") & ".cctk""" , LogTypeVerbose
-			oLogging.CreateEntry "Searched for file in working directory=""" & sOriginalWorkingDirectory & "\" & oEnvironment.Item("Model") & ".cctk""", LogTypeVerbose
 			iRetVal = Failure
-			Exit Sub
+			oLogging.CreateEntry "Unable to find BIOS settings for model, """ & oEnvironment.Item("Model") & """.", LogTypeError
+			oLogging.CreateEntry "Searched for file in variable BIOSSettingsFile=""" & oEnvironment.Item("BIOSSettingsFile") & "" , LogTypeVerbose
+			oLogging.CreateEntry "Searched for file in working directory + BIOSSettingsFile=""" & sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk""", LogTypeVerbose	
+		Else
+			oLogging.CreateEntry "Copying the CCTK settings to a local location, to prevent any network or rights problems.""", LogTypeVerbose	
+			oFSO.CopyFile sBIOSSettingsFile , sCCTKPath & "\CCTKSettings.cctk"
+			iRetCode = RunCCTK("""-i=CCTKSettings.cctk""") 
 		End If
 
-		oFSO.CopyFile sBIOSSettingsFile , sCCTKpath & "\BIOSSettings.cctk"
-		sLocalBIOSSettings = sCCTKpath & "\BIOSSettings.cctk"
-
-		If RunCCTK("""-i=" & sLocalBIOSSettings & """") = 0 Then oLogging.CreateEntry "Settings have been processed." , LogTypeInfo
+		If iRetVal = Success And iRetCode = 0 Then
+			oLogging.CreateEntry "Set CCTK settings, has succesfully completed." , LogTypeInfo
+		Else
+			oLogging.CreateEntry "Set CCTK settings, has failed." , LogTypeWarning
+		End If
 	End Sub
 
 	Private Sub SetArguments(Arguments)
+		oLogging.CreateEntry "Set CCTK argument(s), has started." , LogTypeVerbose
+		
 		If Not IsEmpty(Arguments) Then
-			oLogging.CreateEntry "Set arguments has started." , LogTypeVerbose
-			oLogging.CreateEntry "Arguments Are: " & Arguments, LogTypeVerbose
-
-			If RunCCTK("""" & Arguments & """") = 0 Then oLogging.CreateEntry "Arguments have been processed." , LogTypeInfo
+			oLogging.CreateEntry "CCTK argument(s) in command-line arguments found: """ & Arguments & """.", LogTypeVerbose
+	
+			iRetCode = RunCCTK("""" & Arguments & """")
 		Else
-			Dim sArgument,sCommand
-
-			oLogging.CreateEntry "Set arguments has started." , LogTypeVerbose
-			oLogging.CreateEntry "No arguments specified, searching for arguments in variable list ""BIOSArguments""", LogTypeVerbose
-			oLogging.CreateEntry oEnvironment.ListItem("BIOSArguments").Count & " argument(s) found.", LogTypeVerbose
-
+			Dim sArgument
+			
 			For Each sArgument In oEnvironment.ListItem("BIOSArguments")
 				sCommand = sCommand & """" & sArgument & """ "
 			Next
-
-			If RunCCTK(sCommand) = 0 Then oLogging.CreateEntry "Arguments have been processed." , LogTypeInfo
+			
+			oLogging.CreateEntry "CCTK argument(s), " & oEnvironment.ListItem("BIOSArguments").Count & ", in variablelist ""BIOSArguments"" found: """ & sCommand & """.", LogTypeVerbose
+			
+			iRetCode = RunCCTK(sCommand)
+		End If
+		
+		If iRetCode = 0 Then 
+			oLogging.CreateEntry "Set CCTK argument(s), has succesfully completed." , LogTypeInfo
+		Else
+			oLogging.CreateEntry "Set CCTK argument(s), has failed." , LogTypeWarning
 		End If
 	End Sub
 
-	Private Sub SetPassword(Pwd, Force)
-		oLogging.CreateEntry "Set password has started." , LogTypeVerbose
+	Private Sub SetPassword(Pwd)
+		oLogging.CreateEntry "Set BIOS password, has started." , LogTypeVerbose
 
 		If RunCCTK("""--setuppwd=" & Pwd & """") = 0 Then
-			oLogging.CreateEntry "Password has been set." , LogTypeInfo
+			oLogging.CreateEntry "Set BIOS password, has succesfully completed." , LogTypeInfo
 			sCurrentBIOSPassword = Pwd
+		Else 
+			oLogging.CreateEntry "Set BIOS password, has failed." , LogTypeWarning
 		End If
 	End Sub
 
 	Private Function RunCCTK(Arguments)
-		Dim sCommand, bPwd
-		sCommand = sCCTKpath & "\cctk.exe " & Arguments
+		sCommand = "cctk.exe " & Arguments
 
-		If Not IsEmpty(sCurrentBIOSPassword) Then bPwd = true
-
-		If bPwd Then
+		If Not sCurrentBIOSPassword = "" Then
 			sCommand = sCommand & " ""--valsetuppwd=" & sCurrentBIOSPassword & """"
-			oLogging.CreateEntry "Going to run this command """ & sCommand & """", LogTypeVerbose
-		Else
-			oLogging.CreateEntry "Going to run this command """ & sCommand & """" , LogTypeVerbose
 		End If
+		oLogging.CreateEntry "About to run CCTK command: """ & sCommand & """." , LogTypeVerbose
 
 		iRetCode = oShell.Run(sCommand, 0, True)
 		If iRetCode = 0 Then
-			oLogging.CreateEntry "Above command completed successfully" , LogTypeVerbose
+			oLogging.CreateEntry "CCTK command has successfully completed." , LogTypeVerbose
 		Else
-			oLogging.CreateEntry "CCTK command """ & sCommand & """ gave an error." , LogTypeError
-			oLogging.CreateEntry "CCTK error was """ & ReturnErrorMessage(iRetCode) & """"  , LogTypeError
-			iRetVal = Failure
+			oLogging.CreateEntry "CCTK command: """ & sCommand & """ returned with an error." , LogTypeWarning
+			oLogging.CreateEntry ReturnErrorMessage(iRetCode), LogTypeError
 		End If
 
 		RunCCTK = iRetCode
 	End Function
 
-	Private Function CheckPassword
-		oLogging.CreateEntry "Trying to determine if there is a BIOS password installed" , LogTypeVerbose
+	Private Sub CheckPassword
 		Dim sTestVal, sPrevAssetTag
+		Dim bPwd
+		oLogging.CreateEntry "Check for BIOS password, has started." , LogTypeVerbose
+		
 		sTestVal = "Asset"
 		sPrevAssetTag = oEnvironment.Item("AssetTag")
-		oShell.CurrentDirectory = sCCTKpath
-		iRetCode = oShell.Run("cctk.exe --asset=" & sTestVal , 0, True)
-
-		'Command was successful so no password.
-
-		If iRetCode = 0 Then
-			oLogging.CreateEntry "No BIOS password installed" , LogTypeInfo
-			iRetCode = oShell.Run("cctk.exe --asset=""" & sPrevAssetTag & "" , 0, True)
-			CheckPassword = False
+		sCommand = "cctk.exe --asset=" & sTestVal
+		
+		oLogging.CreateEntry "About to run CCTK command: """ & sCommand & """." , LogTypeVerbose
+		iRetCode = oShell.Run(sCommand, 0, True)
+		
+		If Not iRetCode = 0 Or iRetCode = 180 Or iRetCode = 191 Then
+			oLogging.CreateEntry "CCTK command: """ & sCommand & """ returned with an error." , LogTypeWarning
+			oLogging.CreateEntry ReturnErrorMessage(iRetCode), LogTypeError
+		ElseIf iRetCode = 0 Then
+			oLogging.CreateEntry "No BIOS password is currently installed." , LogTypeInfo
 		ElseIf iRetCode = 180 Or iRetCode = 191 Then
-
-		'Try to find the current BIOS password.
-
-			oLogging.CreateEntry "BIOS password installed" , LogTypeInfo
-			oLogging.CreateEntry "Searching for a matching BIOS password in variable list ""BIOSPasswords""" , LogTypeVerbose
+			bPwd = True
+			oLogging.CreateEntry "A BIOS password is currently installed." , LogTypeInfo
+			oLogging.CreateEntry "Searching for a matching BIOS password in variablelist ""BIOSPasswords""." , LogTypeVerbose
 			Dim sPwd
 			For Each sPwd In oEnvironment.ListItem("BIOSPasswords")
-				iRetCode = oShell.Run("cctk.exe --asset=""" & sTestVal & """ --valsetuppwd=""" & sPwd & """", 0, True)
-				If iRetCode = 0 Then
+				sCommand = "cctk.exe --asset=""" & sTestVal & """ --valsetuppwd=""" & sPwd & """"
+				oLogging.CreateEntry "About to try BIOS password: """ & sPwd & """ with CCTK command: """ & sCommand & """." , LogTypeVerbose
+				
+				iRetCode = oShell.Run(sCommand, 0, True)
+				
+				If iRetCode = 0 Then 
+					'Succesfully set the AssetTag, this must be the right password
 					sCurrentBIOSPassword = sPwd
-					iRetCode = oShell.Run("cctk.exe --asset=""" &sPrevAssetTag & """ --valsetuppwd=""" & sPwd & """", 0, True)
 					Exit For
+				Else
+					oLogging.CreateEntry "CCTK Command for BIOS password: """ & sPwd & """ returned with an error, this is not the correct password." , LogTypeVerbose
 				End If
 			Next
-
+			
 			If sCurrentBIOSPassword = "" Then
-				oLogging.CreateEntry "There was no matching BIOS password found, please check for missing passwords in the rules.", LogTypeError
+				oLogging.CreateEntry "Check for BIOS password, has failed." , LogTypeWarning
+				oLogging.CreateEntry "There was no matching BIOS password found, please add the missing password(s) to the variablelist ""BIOSPasswords"".", LogTypeInfo
+				iRetVal = Failure
 			Else
-				oLogging.CreateEntry "Successfully found a matching BIOS password" , LogTypeInfo
-			End If
-			CheckPassword = True
-
-		Else
-			oLogging.CreateEntry "CCTK command """ & sCommand & """ gave an error." , LogTypeError
-			oLogging.CreateEntry "CCTK error was """ & ReturnErrorMessage(iRetCode) & """"  , LogTypeError
-			iRetVal = Failure
+				oLogging.CreateEntry "CCTK Command for BIOS password: """ & sPwd & """ has succesfully completed, BIOS password found." , LogTypeVerbose
+			End If		
 		End If
+		
+		If bPwd And Not sCurrentBIOSPassword = "" Or bPwd = False Then 
+			'The 2 succesful scenario's for this sub.	
+			If Not RunCCTK("""--asset=" & sPrevAssetTag & """") = 0 Then 
+				'Try to set the original AssetTag.
+				oLogging.CreateEntry "Check for BIOS password, has failed." , LogTypeWarning
+				oLogging.CreateEntry "Could not rollback AssetTag to original value, check BIOS for correctness." , LogTypeInfo
+			Else
+				oLogging.CreateEntry "Check for BIOS password, has succesfully completed." , LogTypeInfo
+			End If
+		End If
+	End Sub
+
+	Private Function IsRelativePath(Path)
+		If Not InStr(Path, "\") = 1 And Not InStr(Path, ":\") = 2 Then 
+			IsRelativePath = True
+		End If
+		IsRelativePath = False
 	End Function
 
 	Private Function ReturnErrorMessage(iRetCode)
-		Dim oErrorCodes,oNode
+		'This function must ignore all runtime errors so that the CCTK error gets reported.
+		On Error Resume Next
+		Dim oErrorCodes,oNode,sMessage
+		
+		'CCTK error has been reported, script has failed.
 		iRetVal = Failure
-		If oFSO.FileExists(sCCTKpath & "\cctkerrorcodes.xml") Then
-			Set oErrorCodes = oUtility.CreateXMLDOMObjectEx(sCCTKpath & "\cctkerrorcodes.xml")
+		
+		If oFSO.FileExists(sCCTKPath & "\cctkerrorcodes.xml") Then
+			Set oErrorCodes = oUtility.CreateXMLDOMObjectEx(sCCTKPath & "\cctkerrorcodes.xml")
 			Set oNode = oErrorCodes.SelectSingleNode("//ResultCode[@Code=" & iRetCode & "]")
-			ReturnErrorMessage = oNode.getAttribute("Description")
+			
+			sMessage = "CCTK returned errorcode: " & iRetCode & ", """ & oNode.getAttribute("Description") & """."
+			
+			If Err Then
+				'Unable to create XML object or read XML file.
+				ReturnErrorMessage = "CCTK returned errorcode: " & iRetCode & ", error on reading ""cctkerrorcodes.xml"" in CCTK location, no errorcode translation was possible." 
+				Err.Clear
+			Else
+				ReturnErrorMessage = sMessage
+			End If
 		Else
-			ReturnErrorMessage = "Cannot find " & sCCTKpath & "\cctkerrorcodes.xml" & " no errorcode translation is possible, the code was:" & iRetCode
+			ReturnErrorMessage = "CCTK returned errorcode: " & iRetCode & ", could not find ""cctkerrorcodes.xml"" in CCTK location, no errorcode translation was possible." 
 		End If
 	End Function
 
