@@ -10,7 +10,7 @@
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.5.0000.00
+' // Version:   1.5.1000.00
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
@@ -172,6 +172,7 @@ Class ZTIDellBIOSSettings
 
 	Private Sub SetArguments(Arguments)
 		oLogging.CreateEntry "Set CCTK argument(s), has started." , LogTypeVerbose
+		iRetCode = -1
 		
 		If Not IsEmpty(Arguments) Then
 			oLogging.CreateEntry "CCTK argument(s) in command-line arguments found: """ & Arguments & """.", LogTypeVerbose
@@ -179,18 +180,23 @@ Class ZTIDellBIOSSettings
 			iRetCode = RunCCTK("""" & Arguments & """")
 		Else
 			Dim sArgument
+			sCommand = ""
 			
 			For Each sArgument In oEnvironment.ListItem("BIOSArguments")
 				sCommand = sCommand & """" & sArgument & """ "
 			Next
 			
-			oLogging.CreateEntry "CCTK argument(s), " & oEnvironment.ListItem("BIOSArguments").Count & ", in variablelist ""BIOSArguments"" found: """ & sCommand & """.", LogTypeVerbose
-			
-			iRetCode = RunCCTK(sCommand)
+			If oEnvironment.ListItem("BIOSArguments").Count > 0 Then
+				oLogging.CreateEntry "CCTK argument(s), " & oEnvironment.ListItem("BIOSArguments").Count & ", in variablelist ""BIOSArguments"" found: """ & sCommand & """.", LogTypeVerbose
+				
+				iRetCode = RunCCTK(sCommand)
+			End If
 		End If
 		
 		If iRetCode = 0 Then 
 			oLogging.CreateEntry "Set CCTK argument(s), has succesfully completed." , LogTypeInfo
+		ElseIf iRetCode = -1 Then
+			oLogging.CreateEntry "Set CCTK argument(s), had nothing to process." , LogTypeInfo
 		Else
 			oLogging.CreateEntry "Set CCTK argument(s), has failed." , LogTypeWarning
 		End If
@@ -238,7 +244,7 @@ Class ZTIDellBIOSSettings
 		oLogging.CreateEntry "About to run CCTK command: """ & sCommand & """." , LogTypeVerbose
 		iRetCode = oShell.Run(sCommand, 0, True)
 		
-		If Not iRetCode = 0 Or iRetCode = 180 Or iRetCode = 191 Then
+		If Not iRetCode = 0 And Not iRetCode = 180 And Not iRetCode = 191 Then
 			oLogging.CreateEntry "CCTK command: """ & sCommand & """ returned with an error." , LogTypeWarning
 			oLogging.CreateEntry ReturnErrorMessage(iRetCode), LogTypeError
 		ElseIf iRetCode = 0 Then
