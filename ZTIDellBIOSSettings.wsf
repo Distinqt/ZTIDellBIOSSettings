@@ -10,7 +10,7 @@
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.5.1000.00
+' // Version:   1.5.1000.10
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
@@ -145,20 +145,20 @@ Class ZTIDellBIOSSettings
 	Private Sub SetSettings(Settingspath)
 		oLogging.CreateEntry "Set CCTK settings, has started." , LogTypeVerbose
 
-		If oEnvironment.Exists("BIOSSettingsFile") Then
+		If oFSO.FileExists(oEnvironment.Item("BIOSSettingsFile")) Then
 			sBIOSSettingsFile = oEnvironment.Item("BIOSSettingsFile")
-		ElseIf IsRelativePath(oEnvironment.Item("BIOSSettingsFile")) And oFSO.FileExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk") Then
+		ElseIf IsRelativePath(oEnvironment.Item("BIOSSettingsFile")) And oFSO.FileExists(sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile")) Then
 			'Check the original working directory + BIOSSettingsFile variable for settings. This way SCCM settings- or complete CCTK packages are possible.
-			sBIOSSettingsFile = sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk"
+			sBIOSSettingsFile = sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile")
 		End If
 
 		If Not oFSO.FileExists(sBIOSSettingsFile) Then
 			iRetVal = Failure
 			oLogging.CreateEntry "Unable to find BIOS settings for model, """ & oEnvironment.Item("Model") & """.", LogTypeError
 			oLogging.CreateEntry "Searched for file in variable BIOSSettingsFile=""" & oEnvironment.Item("BIOSSettingsFile") & "" , LogTypeVerbose
-			oLogging.CreateEntry "Searched for file in working directory + BIOSSettingsFile=""" & sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & "\" & oEnvironment.Item("Model") & ".cctk""", LogTypeVerbose	
+			oLogging.CreateEntry "Searched for file in working directory + BIOSSettingsFile=""" & sOriginalWorkingDirectory & "\" & oEnvironment.Item("BIOSSettingsFile") & """", LogTypeVerbose	
 		Else
-			oLogging.CreateEntry "Copying the CCTK settings to a local location, to prevent any network or rights problems.""", LogTypeVerbose	
+			oLogging.CreateEntry "Copying the CCTK settings to a local location, to prevent any network or rights problems.", LogTypeVerbose	
 			oFSO.CopyFile sBIOSSettingsFile , sCCTKPath & "\CCTKSettings.cctk"
 			iRetCode = RunCCTK("""-i=CCTKSettings.cctk""") 
 		End If
