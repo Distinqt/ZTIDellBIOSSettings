@@ -10,7 +10,7 @@
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.5.2000.10
+' // Version:   1.5.2000.20
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
@@ -34,7 +34,7 @@ Class ZTIDellBIOSSettings
 		iPrep = Success
 		sOriginalWorkingDirectory = oShell.CurrentDirectory
 
-		oLogging.CreateEntry "ZTIDellBIOSSettings has started." , LogTypeInfo
+		oLogging.CreateEntry "ZTIDellBIOSSettings v1.5.2000.20 has started." , LogTypeInfo
 		'Validate that this is a Dell system.
  		If Not oEnvironment.Item("Make") = "Dell Inc." Then
 			oLogging.CreateEntry "ZTIDellBIOSSettings can only run on Dell systems.", LogTypeError
