@@ -10,7 +10,7 @@
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.5.1000.10
+' // Version:   1.5.2000.10
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
@@ -291,10 +291,13 @@ Class ZTIDellBIOSSettings
 	End Sub
 
 	Private Function IsRelativePath(Path)
-		If Not InStr(Path, "\") = 1 And Not InStr(Path, ":\") = 2 Then 
+		If (Not InStr(Path, "\") = 1) And (Not InStr(Path, ":\") = 2) Then 
+			oLogging.CreateEntry "IsRelativePath, the path: """ & Path & """ is relative.", LogTypeVerbose
 			IsRelativePath = True
+		Else
+			oLogging.CreateEntry "IsRelativePath, the path: """ & Path & """ is not relative.", LogTypeVerbose
+			IsRelativePath = False
 		End If
-		IsRelativePath = False
 	End Function
 
 	Private Function ReturnErrorMessage(iRetCode)
