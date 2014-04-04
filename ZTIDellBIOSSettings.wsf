@@ -10,7 +10,7 @@
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
 ' //
-' // Version:   1.5.2000.20
+' // Version:   1.5.2000.30
 ' //
 ' // Purpose:   Update Dell BIOS settings.
 ' //
@@ -34,7 +34,7 @@ Class ZTIDellBIOSSettings
 		iPrep = Success
 		sOriginalWorkingDirectory = oShell.CurrentDirectory
 
-		oLogging.CreateEntry "ZTIDellBIOSSettings v1.5.2000.20 has started." , LogTypeInfo
+		oLogging.CreateEntry "ZTIDellBIOSSettings v1.5.2000.30 has started." , LogTypeInfo
 		'Validate that this is a Dell system.
  		If Not oEnvironment.Item("Make") = "Dell Inc." Then
 			oLogging.CreateEntry "ZTIDellBIOSSettings can only run on Dell systems.", LogTypeError
@@ -183,6 +183,11 @@ Class ZTIDellBIOSSettings
 			sCommand = ""
 			
 			For Each sArgument In oEnvironment.ListItem("BIOSArguments")
+				'Trim a single pair of quotes from the argument value
+				If InStr(sArgument,"""") = 1 And InStr(sArgument,"""") = Len(sArgument) Or InStr(sArgument,"'") = 1 And InStr(sArgument,"'") = Len(sArgument) Then
+					sArgument = Left(Right(sArgument, Len(sArgument) - 1), Len(sArgument) - 1)
+				End If
+				
 				sCommand = sCommand & """" & sArgument & """ "
 			Next
 			
