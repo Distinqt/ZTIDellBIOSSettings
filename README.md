@@ -1,14 +1,14 @@
 ZTIDellBIOSSettings
 ===================
 
-The go to script for zero-touch Dell BIOS configuration.
+The go to, and only, script for zero-touch Dell BIOS configuration.
 
 # What does ZTIDellBIOSSettings do?
-ZTIDellBIOSSettings (what a mouthful) is a vbs script that can be included in a MDT or SCCM+MDT environment. It does several things.  
+ZTIDellBIOSSettings is a vbs script that can be included in a MDT or SCCM environment. It does several things.
 
-It sets up the CCTK (Client Configuration ToolKit) environment, initializes WMI, installs the HAPI driver, and checks all the files for existence.
+First it sets up the CCTK (Client Configuration ToolKit) environment, initializes WMI, installs the HAPI driver, and checks all the files for existence.
 
-ZTIDellBIOSSettings allows you to do the following:
+Then ZTIDellBIOSSettings allows you to do the following:
 - Pass arguments to CCTK  
 ```
 cscript ZTIDellBIOSSettings.wsf /arguments:"--assettag=PC1000"
@@ -21,21 +21,20 @@ cscript ZTIDellBIOSSettings.wsf /settings:"%path to file%"
 ```
 cscript ZTIDellBIOSSettings.wsf /password
 ```
-- Or of course a combination of the above
+- Or any combination of the above
 
-You are probably thinking by now, wait a minute. So all the work gets forwarded to CCTK?
-That's a useless 250+ lines script.
+Maybe you are thinking by now, wait a minute. So all the work gets forwarded to CCTK?
 
-You are almost right, I did not posses the will (or time for that matter) to reverse enigneer CCTK and incorporate this into my script, what I did do was create an awesome convenience wrapper for CCTK.
+You are almost right, I did not posses the time (or will for that matter) to reverse enigneer CCTK and incorporate this into my script, what I did do was create an awesome MDT and SCCM compatible wrapper for CCTK.
 
-For instance this script has a great password tester. When you give ZTIDellBIOSSettings an argument it will try to find the right password for the BIOS in the _BIOSPasswords_ list variable. Once it has found a match it adds that to the commandline it gives to CCTK.  
-This has the huge added advantage of not having to hope all your systems have the same BIOS password. CCTK itself has no way of doing this or even testing if there is a password required.
+This script has a great password tester. When you give ZTIDellBIOSSettings an argument it will try to find the right password for the BIOS in the _BIOSPasswords_ list variable. Once it has found a match it adds that to the commandline it gives to CCTK.  
+This has the huge benefit of not having to create a ton of different executables for the different BIOS passwords that may still be lingering on your network. CCTK itself has no way of doing this or even testing if there is a password required.
 
-Via the _BIOSArguments_ list variable or the "Arguments" argument you could do all kind of dynamic things.
-Like set the assettag or propertyownertag of the bios to the computername.
+And with the _BIOSArguments_ list variable or the "Arguments" argument you could do all kind of dynamic things.
+Set the assettag or propertyownertag of the bios to the computername or allowing usb booting based on the department the computer is in.
 
-It has helpful logging and errorhandling to pinpoint problems with the script or CCTK.
-It even translates CCTK errorcodes with the help of "cctkerrorcodes.xml" into a human readable error message!
+ZTIDellBIOSSettings has very helpful logging and error handling to pinpoint problems with the script, MDT/SCCM or CCTK.
+It can even translate the CCTK errorcodes into a human readable error message. Though it needs some help of "cctkerrorcodes.xml" for doing that. 
 
 __What are you waiting for? Download it and give it a spin.__
 
@@ -153,12 +152,39 @@ And an empty propowntag.
 
 >If you use the list, the script uses "ZTIUtility.vbs" which doesn't suffer from this. 
 
+## Gloating section
+
+Some bug fixes, beautifications, extra logging, and features later I am confident that this tool will fare well in even the most demanding environments.
+It has been successfully used for more than 3000+ computers, and numerous iterations of reconfiguration.
+
+You can trust that this script will satisfy.
+
 -----------------
-The code is provided as-is and I hold no responsability.
+## License
 
-You are allowed to use this for non-commercial usage.  
-Contact me for commercial usage, commercial usage is, but not limited to, distribution of these source files, integration into commercial software, or using it as content for your commercial services.
+(The MIT License)
 
-If you would like to use excerpts for an article or book, please feel free to do so but do contact me, I would love to have a chat.
+Copyright (c) 2014 Nino Floris &lt;ninofloris@gmail.com&gt;
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+If you would like to use excerpts for an article or book. Please feel free to do so.However I would love to have a chat.
 
 [![githalytics.com alpha](https://cruel-carlota.pagodabox.com/eeb9f83085564f822d849a2c34a0903f "githalytics.com")](http://githalytics.com/NinoFloris/ZTIDellBIOSSettings)

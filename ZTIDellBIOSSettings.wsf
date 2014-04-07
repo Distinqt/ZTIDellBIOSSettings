@@ -3,9 +3,11 @@
 	<script language="VBScript">
 ' // ***************************************************************************
 ' //
-' // Copyright (c)	Nino Floris.  You are allowed to use this for non-commercial usage.
-' // Please contact me for commercial usage, commercial usage is, but not limited to,
-' // distribution of these source files, integration into commercial software, or using it as part of your commercial services.
+' // ZTIDellBIOSSettings 
+' // https://github.com/NinoFloris/ZTIDellBIOSSettings
+' // MIT licensed
+' //
+' // Copyright (c) Nino Floris.
 ' //
 ' //
 ' // File:      ZTIDellBIOSSettings.wsf
